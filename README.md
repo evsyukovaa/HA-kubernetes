@@ -62,6 +62,8 @@ enp1s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP gro
        valid_lft 5718sec preferred_lft 5718sec
     inet 192.168.32.66/24 brd 192.168.32.255 scope global secondary enp1s0:0
 ```
+- Уже предпологается что установлены docker,kubeadm,kubelet,kubectl (готовые лежат на as4:/backup/images/k8s-clean)
+
 
 
 
