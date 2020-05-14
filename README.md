@@ -91,3 +91,45 @@ k8s-etcd1# etcdctl --cert="/etc/kubernetes/pki/etcd/peer.crt" --key="/etc/kubern
 | https://192.168.32.67:2379 | 41d21d5686477304 |   3.4.3 |   20 kB |      true |      false |         8 |        239 |                239 |        |
 +----------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
 ```
+- Настраиваем мастер ноды, на первой масетре ноде k8s-master1 запустим скрипт scripts/master-cluster.sh
+- Скрипт создаст конфиг, скопирует все необходимы ключи, инициализирует масетр ноду, и запишет токен который понадобится для подключения второй мастер ноды в /root/init-cluster-tocken, так же скопирует все необходимы ключи и на k8s-master2.
+- После выполнения скрипта, проверяем что мастер нода поднялась
+```
+k8s-master1# kubectl get po -n kube-system
+NAME                                  READY   STATUS    RESTARTS   AGE
+coredns-66bff467f8-5kfdd              1/1     Running   1          33m
+coredns-66bff467f8-fj9sv              1/1     Running   1          33m
+kube-apiserver-k8s-master1            1/1     Running   2          33m
+kube-apiserver-k8s-master2            1/1     Running   0          110s
+kube-controller-manager-k8s-master1   1/1     Running   2          33m
+kube-controller-manager-k8s-master2   1/1     Running   0          109s
+kube-proxy-84pzk                      1/1     Running   0          111s
+kube-proxy-8dvd8                      1/1     Running   2          33m
+kube-scheduler-k8s-master1            1/1     Running   2          33m
+kube-scheduler-k8s-master2            1/1     Running   0          109s
+weave-net-dq9sp                       2/2     Running   5          30m
+weave-net-g2lg4                       2/2     Running   0          111s
+
+k8s-master1# kubectl get nodes
+NAME          STATUS   ROLES    AGE   VERSION
+k8s-master1   Ready    master   82m   v1.18.2
+```
+- Если все хорошо то присоединяем вторую мастер ноду к кластеру токен и sha берем из /root/init-cluster-tocken на первой мастре ноду, и ОБЯЗАТЕЛЬНО ключ --control-plane без него будет просто worker нода добавлена
+```
+k8s-master2# kubeadm join 192.168.32.66:6443 --control-plane --token tocke_key --discovery-token-ca-cert-hash sha256:tocken_sha
+```
+- Теперь подключим все рабочие ноды, запустим туже команду что и выше, только без ключа --control-plane
+```
+k8s-worker1-3# kubeadm join 192.168.32.66:6443 --token tocke_key --discovery-token-ca-cert-hash sha256:tocken_sha
+```
+- Проверяем что все подключились:
+```
+kubectl get nodes
+NAME          STATUS   ROLES    AGE   VERSION
+k8s-master1   Ready    master   82m   v1.18.2
+k8s-master2   Ready    master   50m   v1.18.2
+k8s-worker1   Ready    worker   41m   v1.18.2
+k8s-worker2   Ready    worker   41m   v1.18.2
+k8s-worker3   Ready    worker   40m   v1.18.2
+```
+- У нас есть полностью настроенный HA-кластер Kubernetes с двумя мастер- и тремя рабочими нодами. Он построен на основе кластера HA etcd с отказоустойчивым балансировщиком нагрузки перед мастер-нодами
