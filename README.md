@@ -1,2 +1,2 @@
 # HA-kubernetes
-multi master cluster and haproxy with hearbeat
+Multi master cluster and haproxy with hearbeat on baremetall
