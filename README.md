@@ -63,7 +63,31 @@ enp1s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP gro
     inet 192.168.32.66/24 brd 192.168.32.255 scope global secondary enp1s0:0
 ```
 - Уже предпологается что установлены docker,kubeadm,kubelet,kubectl (готовые лежат на as4:/backup/images/k8s-clean)
+- На всех etcd нодах нужно добавить новый файл конфигурации systemd для юнита kubelet с более высоким приоритетом:
+```
+- cat << EOF > /etc/systemd/system/kubelet.service.d/20-etcd-service-manager.conf
+[Service]
+ExecStart=
+ExecStart=/usr/bin/kubelet --address=127.0.0.1 --pod-manifest-path=/etc/kubernetes/manifests
+Restart=always
+EOF
+```
+- Заходим на k8s-etcd1 (предварительно должны быть настроены ssh ключи между серверами) и выполняем скрипт (scripts/etcd-cluster.sh)
+- После выполнения скрипта перезапустим kubelet на всех нодах etcd
+```
+systemctl restart kubelet
+```
+-Проверить что класетр рабочий командой:
+```
+k8s-etcd1# etcdctl endpoint status --cert="/etc/kubernetes/pki/etcd/peer.crt" --key="/etc/kubernetes/pki/etcd/peer.key" --cacert="/etc/kubernetes/pki/etcd/ca.crt" --endpoints=https://192.168.32.67:2379 -w table
+52bc66b324ada68, started, k8s-etcd2, https://192.168.32.68:2380, https://192.168.32.68:2379, false
+5342bb862fda1a8, started, k8s-etcd3, https://192.168.32.69:2380, https://192.168.32.69:2379, false
+41d21d5686477304, started, k8s-etcd1, https://192.168.32.67:2380, https://192.168.32.67:2379, false
 
-
-
-
+k8s-etcd1# etcdctl --cert="/etc/kubernetes/pki/etcd/peer.crt" --key="/etc/kubernetes/pki/etcd/peer.key" --cacert="/etc/kubernetes/pki/etcd/ca.crt" --endpoints=https://192.168.32.67:2379 member list
++----------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|          ENDPOINT          |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++----------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| https://192.168.32.67:2379 | 41d21d5686477304 |   3.4.3 |   20 kB |      true |      false |         8 |        239 |                239 |        |
++----------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+```
